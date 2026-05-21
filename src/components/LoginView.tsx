@@ -153,19 +153,6 @@ export default function LoginView({ onLogin }: LoginViewProps) {
             )}
           </button>
         </form>
-
-        {/* Credentials helper card */}
-        <div className="mt-8 pt-6 border-t border-slate-900 text-left">
-          <div className="p-4 bg-blue-950/20 border border-blue-900/30 rounded-2xl">
-            <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-              <span>💡</span> Credenciales Iniciales
-            </p>
-            <div className="text-[10px] text-slate-400 space-y-1 leading-relaxed font-mono">
-              <div><span className="text-slate-500">Usuario:</span> <b className="text-slate-200">Admin</b></div>
-              <div><span className="text-slate-500">Contraseña:</span> <b className="text-slate-200">12345</b></div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );
