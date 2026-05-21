@@ -142,6 +142,7 @@ export default function App() {
     storage.getTicketSettings(),
   );
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [confirmLogout, setConfirmLogout] = useState(false);
 
   // Guardar configuración de auto-guardado cuando cambie
   useEffect(() => {
@@ -871,18 +872,36 @@ export default function App() {
                 <p className="text-[8px] text-slate-500 font-bold uppercase truncate mt-1">{currentUser?.cargo}</p>
               </div>
             </div>
-            <button
-              onClick={() => {
-                if (window.confirm("¿Seguro que desea cerrar sesión en el sistema?")) {
-                  setCurrentUser(null);
-                  storage.saveCurrentUser(null);
-                }
-              }}
-              className="text-[9px] font-black text-rose-400 hover:text-rose-300 uppercase tracking-widest bg-rose-500/10 hover:bg-rose-500/20 px-2.5 py-1.5 rounded-lg transition-all shrink-0"
-              title="Cerrar sesión"
-            >
-              SALIR
-            </button>
+            {confirmLogout ? (
+              <div className="flex items-center gap-1 shrink-0" onMouseLeave={() => setConfirmLogout(false)}>
+                <button
+                  onClick={() => {
+                    setCurrentUser(null);
+                    storage.saveCurrentUser(null);
+                    setConfirmLogout(false);
+                  }}
+                  className="text-[8px] font-black text-rose-100 uppercase tracking-wider bg-rose-600 hover:bg-rose-700 px-2.5 py-1.5 rounded-lg transition-all"
+                  title="Confirmar salida"
+                >
+                  ¿SALIR?
+                </button>
+                <button
+                  onClick={() => setConfirmLogout(false)}
+                  className="text-[8px] font-black text-slate-400 hover:text-slate-300 uppercase tracking-wider bg-slate-800 hover:bg-slate-700 px-2 py-1.5 rounded-lg transition-all"
+                  title="Cancelar"
+                >
+                  NO
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmLogout(true)}
+                className="text-[9px] font-black text-rose-400 hover:text-rose-300 uppercase tracking-widest bg-rose-500/10 hover:bg-rose-500/20 px-2.5 py-1.5 rounded-lg transition-all shrink-0"
+                title="Cerrar sesión"
+              >
+                SALIR
+              </button>
+            )}
           </div>
         </div>
       </aside>
