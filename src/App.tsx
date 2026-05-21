@@ -92,10 +92,15 @@ import {
   QuoteItem,
   TicketSettings,
   AppUser,
+  Empleado,
+  AreaTrabajo,
+  Recibo,
 } from "./types";
 import * as XLSX from "xlsx";
 import LoginView from "./components/LoginView";
 import UsersView from "./components/UsersView";
+import { PersonalView } from "./components/PersonalView";
+import DailyReportView from "./components/DailyReportView";
 
 type AppTab =
   | "dashboard"
@@ -103,6 +108,8 @@ type AppTab =
   | "expense"
   | "billing"
   | "generalBilling"
+  | "personal"
+  | "reporte_diario"
   | "calculator"
   | "cashClose"
   | "condos"
@@ -134,6 +141,9 @@ export default function App() {
   const [suppliers, setSuppliers] = useState<Proveedor[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
+  const [employees, setEmployees] = useState<Empleado[]>([]);
+  const [areas, setAreas] = useState<AreaTrabajo[]>([]);
+  const [receipts, setReceipts] = useState<Recibo[]>([]);
   const [autoSaveSettings, setAutoSaveSettings] = useState<AutoSaveSettings>(
     storage.getAutoSaveSettings(),
   );
@@ -321,6 +331,9 @@ export default function App() {
     const loadedSuppliers = storage.getSuppliers();
     const loadedProducts = storage.getProducts();
     const loadedSales = storage.getSales();
+    const loadedEmployees = storage.getEmployees();
+    const loadedAreas = storage.getWorkAreas();
+    const loadedReceipts = storage.getReceipts();
 
     setCondos(finalCondos);
     setTransactions(loadedTransactions);
@@ -334,6 +347,9 @@ export default function App() {
     setSuppliers(loadedSuppliers);
     setProducts(loadedProducts);
     setSales(loadedSales);
+    setEmployees(loadedEmployees);
+    setAreas(loadedAreas);
+    setReceipts(loadedReceipts);
     setUsers(storage.getUsers());
 
     if (finalCondos.length > 0) {
@@ -397,6 +413,18 @@ export default function App() {
     storage.saveSales(sales);
   }, [sales]);
 
+  useEffect(() => {
+    storage.saveEmployees(employees);
+  }, [employees]);
+
+  useEffect(() => {
+    storage.saveWorkAreas(areas);
+  }, [areas]);
+
+  useEffect(() => {
+    storage.saveReceipts(receipts);
+  }, [receipts]);
+
   const handleAddUser = (newUserData: Omit<AppUser, "createdAt">) => {
     const newUser: AppUser = {
       ...newUserData,
@@ -417,6 +445,30 @@ export default function App() {
 
   const handleDeleteUser = (id: string) => {
     setUsers((prev) => prev.filter((u) => u.id !== id));
+  };
+
+  const handleAddEmployee = (emp: Empleado) => {
+    setEmployees((prev) => [...prev, emp]);
+  };
+
+  const handleUpdateEmployee = (emp: Empleado) => {
+    setEmployees((prev) => prev.map((e) => (e.id === emp.id ? emp : e)));
+  };
+
+  const handleDeleteEmployee = (id: string) => {
+    setEmployees((prev) => prev.filter((e) => e.id !== id));
+  };
+
+  const handleAddArea = (area: AreaTrabajo) => {
+    setAreas((prev) => [...prev, area]);
+  };
+
+  const handleUpdateArea = (area: AreaTrabajo) => {
+    setAreas((prev) => prev.map((a) => (a.id === area.id ? area : a)));
+  };
+
+  const handleDeleteArea = (id: string) => {
+    setAreas((prev) => prev.filter((a) => a.id !== id));
   };
 
   // Redirect to first allowed tab if user lacks privileges for the current tab
@@ -501,6 +553,51 @@ export default function App() {
       id: crypto.randomUUID(),
     };
     setTransactions((prev) => [newTransaction, ...prev]);
+
+    // Automatically generate a receipt record for the system
+    let nextNum = 1;
+    const loadedReceipts = storage.getReceipts();
+    if (loadedReceipts.length > 0) {
+      nextNum = loadedReceipts.length + 1;
+    }
+    const sequence = `REC-${String(nextNum).padStart(4, "0")}`;
+
+    // Determine beneficiary / recipient info
+    let beneficiario = "";
+    if (newTransaction.employeeId) {
+      const emp = employees.find((e) => e.id === newTransaction.employeeId);
+      beneficiario = emp ? `${emp.name} (${emp.role})` : "Empleado / Colaborador";
+    } else if (newTransaction.type === TransactionType.INCOME) {
+      beneficiario = newTransaction.description || "Inquilino / Propietario / Cliente";
+    } else {
+      beneficiario = newTransaction.description || "Proveedor de Servicio / Suministros";
+    }
+
+    const isNomina = newTransaction.category === "NÓMINA" || 
+                     (newTransaction.concept || "").toUpperCase() === "SALARIO" || 
+                     (newTransaction.concept || "").toUpperCase() === "BENEFICIOS DE LEY" ||
+                     newTransaction.employeeId !== undefined;
+
+    const newReceipt: Recibo = {
+      id: crypto.randomUUID(),
+      transactionId: newTransaction.id,
+      tipo: isNomina ? "nomina" : (newTransaction.type === TransactionType.INCOME ? "ingreso" : "egreso"),
+      sequence,
+      concepto: newTransaction.concept || newTransaction.category || "Transacción de Caja",
+      monto: newTransaction.amount,
+      fecha: newTransaction.date,
+      descripcion: newTransaction.description,
+      beneficiario,
+      condominioId: newTransaction.condominioId,
+      createdAt: Date.now()
+    };
+
+    setReceipts((prev) => [newReceipt, ...prev]);
+
+    // Automatically trigger PDF receipt download / print preview
+    setTimeout(() => {
+      generateReceiptPDF(newReceipt);
+    }, 100);
   };
 
   const addUnit = (unit: Omit<Unidad, "id">) => {
@@ -736,6 +833,8 @@ export default function App() {
             currentUser.permissions.includes("expense") ||
             currentUser.permissions.includes("billing") ||
             currentUser.permissions.includes("generalBilling") ||
+            currentUser.permissions.includes("personal") ||
+            currentUser.permissions.includes("reporte_diario") ||
             currentUser.permissions.includes("calculator") ||
             currentUser.permissions.includes("cashClose")
           )) && (
@@ -773,6 +872,22 @@ export default function App() {
                   onClick={() => handleNavClick("generalBilling")}
                   icon={<FileText size={18} className="text-amber-500" />}
                   label="Facturación General"
+                />
+              )}
+              {currentUser.permissions.includes("personal") && (
+                <NavItem
+                  active={activeTab === "personal"}
+                  onClick={() => handleNavClick("personal")}
+                  icon={<Users size={18} className="text-teal-500" />}
+                  label="Personal de Trabajo"
+                />
+              )}
+              {currentUser.permissions.includes("reporte_diario") && (
+                <NavItem
+                  active={activeTab === "reporte_diario"}
+                  onClick={() => handleNavClick("reporte_diario")}
+                  icon={<FileText size={18} className="text-emerald-500" />}
+                  label="Reporte Diario"
                 />
               )}
               {currentUser.permissions.includes("calculator") && (
@@ -921,6 +1036,7 @@ export default function App() {
                 {activeTab === "dashboard" && "Panel de Control"}
                 {activeTab === "billing" && "Facturación Condominio"}
                 {activeTab === "generalBilling" && "Facturación General"}
+                {activeTab === "personal" && "Personal de Trabajo"}
                 {activeTab === "condos" && "Gestión de Condominios"}
                 {activeTab === "settings" && "Personalización"}
               </h2>
@@ -1036,6 +1152,8 @@ export default function App() {
                     onSubmit={addTransaction}
                     onAddConcept={addConcept}
                     getIcon={getIconForCategory}
+                    employees={employees}
+                    areas={areas}
                   />
                 )}
                 {activeTab === "billing" && selectedCondoId && (
@@ -1055,6 +1173,29 @@ export default function App() {
                     setProducts={setProducts}
                     sales={sales}
                     setSales={setSales}
+                    onAddReceipt={(rec) => {
+                      setReceipts((prev) => [rec, ...prev]);
+                    }}
+                  />
+                )}
+                {activeTab === "personal" && (
+                  <PersonalView
+                    employees={employees}
+                    areas={areas}
+                    onAddEmployee={handleAddEmployee}
+                    onUpdateEmployee={handleUpdateEmployee}
+                    onDeleteEmployee={handleDeleteEmployee}
+                    onAddArea={handleAddArea}
+                    onDeleteArea={handleDeleteArea}
+                    onUpdateArea={handleUpdateArea}
+                  />
+                )}
+                {activeTab === "reporte_diario" && (
+                  <DailyReportView
+                    receipts={receipts}
+                    setReceipts={setReceipts}
+                    ticketSettings={ticketSettings}
+                    onPrintReceipt={(rec) => generateReceiptPDF(rec, ticketSettings)}
                   />
                 )}
                 {activeTab === "calculator" && (
@@ -1883,6 +2024,8 @@ interface ExpenseManagerProps {
   onSubmit: (t: any) => void;
   onAddConcept: (catId: string, name: string) => void;
   getIcon: (s: string) => any;
+  employees?: Empleado[];
+  areas?: AreaTrabajo[];
 }
 
 // Expense Manager Component
@@ -1895,6 +2038,8 @@ function ExpenseManager({
   onSubmit,
   onAddConcept,
   getIcon,
+  employees = [],
+  areas = [],
 }: ExpenseManagerProps) {
   const [activeTab, setActiveTab] = useState<"register" | "history">(
     "register",
@@ -1999,6 +2144,8 @@ function ExpenseManager({
                       onRegister={onSubmit}
                       color="rose"
                       actionLabel="PAGO"
+                      employees={employees}
+                      areas={areas}
                     />
                   ))}
               </div>
@@ -2016,6 +2163,8 @@ function ExpenseManager({
                 onRegister={onSubmit}
                 onAddConcept={onAddConcept}
                 condoId={condoId || ""}
+                employees={employees}
+                areas={areas}
               />
             ))}
           </div>
@@ -2136,6 +2285,8 @@ interface ExpenseBoxProps {
   onAddConcept: (catId: string, name: string) => void;
   condoId: string;
   key?: React.Key;
+  employees?: Empleado[];
+  areas?: AreaTrabajo[];
 }
 
 function ExpenseBox({
@@ -2145,6 +2296,8 @@ function ExpenseBox({
   onRegister,
   onAddConcept,
   condoId,
+  employees = [],
+  areas = [],
 }: ExpenseBoxProps) {
   const [showAddConcept, setShowAddConcept] = useState(false);
   const [newConceptName, setNewConceptName] = useState("");
@@ -2211,6 +2364,8 @@ function ExpenseBox({
                 onRegister={onRegister}
                 color="slate"
                 actionLabel="PAGO"
+                employees={employees}
+                areas={areas}
               />
             ))
           )}
@@ -2227,6 +2382,8 @@ interface ExpenseRecordItemProps {
   onRegister: (t: any) => void;
   color: "rose" | "slate";
   key?: React.Key;
+  employees?: Empleado[];
+  areas?: AreaTrabajo[];
 }
 
 function ExpenseRecordItem({
@@ -2236,14 +2393,22 @@ function ExpenseRecordItem({
   onRegister,
   color,
   actionLabel = "PAGO",
+  employees = [],
+  areas = [],
 }: ExpenseRecordItemProps & { actionLabel?: string }) {
   const [isRegistering, setIsRegistering] = useState(false);
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [desc, setDesc] = useState("");
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
 
   const handleRegister = () => {
     if (!amount || isNaN(parseFloat(amount))) return;
+
+    const selectedEmp = employees.find((e) => e.id === selectedEmployeeId);
+    const finalDescription = selectedEmp
+      ? `Pago de nómina a: ${selectedEmp.name} (${selectedEmp.role})${desc ? ` - ${desc}` : ""}`
+      : desc;
 
     onRegister({
       condominioId: condoId,
@@ -2252,11 +2417,13 @@ function ExpenseRecordItem({
       concept: con.name,
       amount: parseFloat(amount),
       date,
-      description: desc,
+      description: finalDescription,
+      employeeId: selectedEmployeeId || undefined,
     });
 
     setAmount("");
     setDesc("");
+    setSelectedEmployeeId("");
     setIsRegistering(false);
   };
 
@@ -2296,6 +2463,51 @@ function ExpenseRecordItem({
             className="overflow-hidden"
           >
             <div className="pt-5 space-y-4 mt-4 border-t border-slate-200">
+              {title === "NÓMINA" && (
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">
+                    Colaborador / Empleado
+                  </label>
+                  {employees.length > 0 ? (
+                    <select
+                      value={selectedEmployeeId}
+                      onChange={(e) => setSelectedEmployeeId(e.target.value)}
+                      className="w-full h-10 bg-white border border-slate-200 rounded-xl px-3 text-xs font-bold outline-none focus:border-rose-500 text-slate-700"
+                    >
+                      <option value="">-- Seleccionar Colaborador --</option>
+                      {areas.map((area) => {
+                        const areaEmps = employees.filter((emp) => emp.areaId === area.id);
+                        if (areaEmps.length === 0) return null;
+                        return (
+                          <optgroup key={area.id} label={area.name}>
+                            {areaEmps.map((emp) => (
+                              <option key={emp.id} value={emp.id}>
+                                {emp.name} ({emp.role})
+                              </option>
+                            ))}
+                          </optgroup>
+                        );
+                      })}
+                      {employees.filter((emp) => !areas.some((a) => a.id === emp.areaId)).length > 0 && (
+                        <optgroup label="Otros / Sin Área">
+                          {employees
+                            .filter((emp) => !areas.some((a) => a.id === emp.areaId))
+                            .map((emp) => (
+                              <option key={emp.id} value={emp.id}>
+                                {emp.name} ({emp.role})
+                              </option>
+                            ))}
+                        </optgroup>
+                      )}
+                    </select>
+                  ) : (
+                    <div className="text-[10px] text-amber-600 bg-amber-50 p-2.5 rounded-lg border border-amber-100 font-medium">
+                      No hay personal registrado en el sistema. Vaya a la pestaña "Personal de Trabajo" para agregarlos.
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">
@@ -4618,6 +4830,165 @@ const generateInvoicePDF = (
   doc.save(`Factura-${sale.id}.pdf`);
 };
 
+const generateReceiptPDF = (receipt: Recibo, settings?: TicketSettings) => {
+  const doc = new jsPDF({
+    unit: "mm",
+    format: "letter",
+  });
+
+  const width = 215.9; // Letter width in mm
+  let y = 15;
+
+  const currentSettings = settings || storage.getTicketSettings();
+  const bizName = currentSettings?.businessName || "SISTEMA DE GESTIÓN";
+  const address = currentSettings?.address || "";
+  const phone = currentSettings?.phone || "";
+  const rnc = currentSettings?.rnc || "";
+
+  // 1. Decorative Header Accent line
+  doc.setFillColor(13, 148, 136); // Teal accent (#0d9488)
+  doc.rect(0, 0, width, 5, "F");
+
+  // Add Company Logo if configured
+  if (currentSettings?.showLogo && currentSettings?.logoUrl) {
+    try {
+      doc.addImage(currentSettings.logoUrl, "JPEG", width / 2 - 12, y, 24, 24);
+      y += 28;
+    } catch (e) {
+      console.error("Error adding logo to PDF", e);
+    }
+  }
+
+  // Title Box
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(20);
+  doc.setTextColor(13, 148, 136);
+  doc.text(bizName.toUpperCase(), width / 2, y, { align: "center" });
+  y += 8;
+
+  // Subtitle
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(100, 116, 139);
+  if (address) {
+    doc.text(address, width / 2, y, { align: "center" });
+    y += 5;
+  }
+  if (phone || rnc) {
+    let contactStr = "";
+    if (phone) contactStr += `Tel: ${phone}  `;
+    if (rnc) contactStr += `RNC: ${rnc}`;
+    doc.text(contactStr, width / 2, y, { align: "center" });
+    y += 8;
+  }
+
+  // Draw elegant double split
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.5);
+  doc.line(15, y, width - 15, y);
+  y += 8;
+
+  // Receipt Meta Box
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.setTextColor(30, 41, 59);
+  const typeLabels: Record<string, string> = {
+    ingreso: "COMPROBANTE DE INGRESO",
+    egreso: "COMPROBANTE DE GASTO / EGRESO",
+    nomina: "COMPROBANTE DE PAGO DE NÓMINA",
+    venta: "COMPROBANTE DE VENTA (POS)",
+    pago_mantenimiento: "COMPROBANTE DE PAGO MANTENIMIENTO",
+  };
+  doc.text(typeLabels[receipt.tipo] || "COMPROBANTE DE TRANSACCIÓN", 15, y);
+
+  // Right: Sequence number and date
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(13, 148, 136);
+  doc.text(`Secuencia: ${receipt.sequence}`, width - 15, y, { align: "right" });
+  y += 6;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Fecha de Emisión: ${receipt.fecha}`, width - 15, y, { align: "right" });
+  y += 12;
+
+  // Table header background box
+  doc.setFillColor(248, 250, 252);
+  doc.rect(15, y, width - 30, 10, "F");
+
+  // Table headers
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(71, 85, 105);
+  doc.text("CONCEPTO / DETALLE DE OPERACIÓN", 18, y + 6.5);
+  doc.text("IMPORTE TOTAL", width - 18, y + 6.5, { align: "right" });
+  
+  doc.setDrawColor(203, 213, 225);
+  doc.line(15, y + 10, width - 15, y + 10);
+  y += 10;
+
+  // Table body content
+  y += 8;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(30, 41, 59);
+  doc.text(receipt.concepto || "Operación General", 18, y);
+  doc.setFont("helvetica", "bold");
+  doc.text(`RD$ ${Number(receipt.monto).toLocaleString("es-DO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, width - 18, y, { align: "right" });
+  y += 6;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Beneficiario / Cliente: ${receipt.beneficiario}`, 18, y);
+  y += 8;
+
+  // Extra Description/Notes
+  if (receipt.descripcion) {
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(8);
+    doc.setTextColor(148, 163, 184);
+    // Draw note box
+    doc.setFillColor(254, 254, 254);
+    doc.rect(18, y, width - 36, 12, "F");
+    
+    // Check line wrapping for note
+    const lines = doc.splitTextToSize(`Nota / Detalle: ${receipt.descripcion}`, width - 40);
+    doc.text(lines, 20, y + 5);
+    y += 18;
+  } else {
+    y += 5;
+  }
+
+  // Draw bottom line
+  doc.setDrawColor(226, 232, 240);
+  doc.line(15, y, width - 15, y);
+  y += 15;
+
+  // Signature lines
+  const sigY = y + 20;
+  doc.setDrawColor(148, 163, 184);
+  doc.line(25, sigY, 85, sigY);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(100, 116, 139);
+  doc.text("Firma de Entrega / Despacho", 55, sigY + 4, { align: "center" });
+
+  doc.line(width - 85, sigY, width - 25, sigY);
+  doc.text("Firma Conforme Beneficiario / Cliente", width - 55, sigY + 4, { align: "center" });
+
+  y = sigY + 15;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(148, 163, 184);
+  doc.text("Este es un comprobante electrónico oficial de caja guardado en el sistema.", width / 2, y, { align: "center" });
+
+  doc.save(`Recibo-${receipt.sequence}.pdf`);
+};
+
 // General Billing View Component
 interface GeneralBillingViewProps {
   settings: TicketSettings;
@@ -4625,6 +4996,7 @@ interface GeneralBillingViewProps {
   setProducts: React.Dispatch<React.SetStateAction<Product[]>>;
   sales: Sale[];
   setSales: React.Dispatch<React.SetStateAction<Sale[]>>;
+  onAddReceipt?: (r: Recibo) => void;
 }
 
 function GeneralBillingView({
@@ -4633,6 +5005,7 @@ function GeneralBillingView({
   setProducts,
   sales,
   setSales,
+  onAddReceipt,
 }: GeneralBillingViewProps) {
   const [activeSubTab, setActiveSubTab] = useState<
     | "ventas"
@@ -4722,6 +5095,7 @@ function GeneralBillingView({
           selectedClientId={selectedClientId}
           setSelectedClientId={setSelectedClientId}
           settings={settings}
+          onAddReceipt={onAddReceipt}
         />
       ) : activeSubTab === "ventas_dia" ? (
         <DailySalesView
@@ -4772,6 +5146,7 @@ function SalesView({
   selectedClientId,
   setSelectedClientId,
   settings,
+  onAddReceipt,
 }: {
   products: Product[];
   setProducts: React.Dispatch<React.SetStateAction<Product[]>>;
@@ -4784,6 +5159,7 @@ function SalesView({
   selectedClientId: string;
   setSelectedClientId: React.Dispatch<React.SetStateAction<string>>;
   settings: TicketSettings;
+  onAddReceipt?: (r: Recibo) => void;
 }) {
   const [itbisEnabled, setItbisEnabled] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -4912,6 +5288,25 @@ function SalesView({
     };
 
     setSales((prev) => [...prev, newSale]);
+
+    if (onAddReceipt) {
+      const loadedReceipts = storage.getReceipts();
+      const nextNum = loadedReceipts.length + 1;
+      const sequence = `REC-${String(nextNum).padStart(4, "0")}`;
+      const newRec: Recibo = {
+        id: crypto.randomUUID(),
+        saleId: newSale.id,
+        tipo: "venta",
+        sequence,
+        concepto: `Venta POS: ${cart.map(item => `${item.description} (x${item.quantity})`).join(", ")}`,
+        monto: newSale.total,
+        fecha: new Date(newSale.date).toISOString().split('T')[0],
+        descripcion: newSale.notes,
+        beneficiario: newSale.clientName || "Cliente General",
+        createdAt: Date.now()
+      };
+      onAddReceipt(newRec);
+    }
 
     // Update inventory
     const updatedProducts = products.map((p) => {

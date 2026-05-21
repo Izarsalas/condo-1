@@ -32,6 +32,8 @@ const MODULES_MAP = [
   { id: "expense", label: "Módulo de Egresos", desc: "Registro de facturas de compras, gastos y nómina", color: "from-rose-500 to-red-500" },
   { id: "billing", label: "Facturador de Condominio", desc: "Recordatorios masivos y emisión de facturas de cuotas", color: "from-sky-500 to-blue-500" },
   { id: "generalBilling", label: "Facturación General POS", desc: "Punto de ventas, almacén de productos e inventario", color: "from-amber-500 to-orange-500" },
+  { id: "personal", label: "Personal de Trabajo", desc: "Registro de empleados, datos de contacto, rol y gestión de áreas", color: "from-teal-600 to-emerald-600" },
+  { id: "reporte_diario", label: "Reporte Diario (Caja y Recibos)", desc: "Impresión, búsqueda, visualización y re-impresión de recibos emitidos", color: "from-cyan-600 to-blue-600" },
   { id: "calculator", label: "Calculadora de Gas", desc: "Mediciones volumétricas y asignaciones de gas", color: "from-orange-500 to-amber-500" },
   { id: "cashClose", label: "Corte de Caja", desc: "Cierre financiero diario y generación física de reportes", color: "from-purple-500 to-indigo-500" },
   { id: "condos", label: "Gestión de Condominios", desc: "Configuración de unidades, propietarios y conserjes", color: "from-slate-700 to-slate-800" },

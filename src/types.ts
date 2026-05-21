@@ -55,6 +55,7 @@ export interface Transaction {
   amount: number;
   date: string;
   description?: string;
+  employeeId?: string;
 }
 
 export interface Category {
@@ -206,4 +207,37 @@ export interface AppUser {
   permissions: string[]; // e.g. ['dashboard', 'income', 'expense', 'billing', 'generalBilling', 'calculator', 'cashClose', 'condos', 'settings']
   createdAt: string;
 }
+
+export interface AreaTrabajo {
+  id: string;
+  name: string;
+  createdAt: number;
+}
+
+export interface Empleado {
+  id: string;
+  name: string;
+  phone: string;
+  address: string;
+  photo?: string;
+  role: string;
+  areaId: string;
+  createdAt: number;
+}
+
+export interface Recibo {
+  id: string;
+  transactionId?: string;
+  saleId?: string;
+  tipo: "ingreso" | "egreso" | "nomina" | "venta" | "pago_mantenimiento";
+  sequence: string;
+  concepto: string;
+  monto: number;
+  fecha: string;
+  descripcion?: string;
+  beneficiario: string;
+  condominioId?: string;
+  createdAt: number;
+}
+
 

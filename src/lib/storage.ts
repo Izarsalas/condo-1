@@ -15,7 +15,10 @@ import {
   Client,
   Quote,
   TicketSettings,
-  AppUser
+  AppUser,
+  Empleado,
+  AreaTrabajo,
+  Recibo
 } from '../types';
 
 const STORAGE_KEYS = {
@@ -37,7 +40,10 @@ const STORAGE_KEYS = {
   TICKET_SETTINGS: 'condobill_ticket_settings',
   AUTO_SAVE_SETTINGS: 'condobill_auto_save_settings',
   USERS: 'condobill_users',
-  CURRENT_USER: 'condobill_current_user'
+  CURRENT_USER: 'condobill_current_user',
+  EMPLOYEES: 'condobill_employees',
+  WORK_AREAS: 'condobill_work_areas',
+  RECEIPTS: 'condobill_receipts'
 };
 
 export const DEFAULT_ADMIN_USER: AppUser = {
@@ -46,7 +52,7 @@ export const DEFAULT_ADMIN_USER: AppUser = {
   username: 'Admin',
   passwordHash: '12345',
   cargo: 'Administrador',
-  permissions: ['dashboard', 'income', 'expense', 'billing', 'generalBilling', 'calculator', 'cashClose', 'condos', 'settings', 'users'],
+  permissions: ['dashboard', 'income', 'expense', 'billing', 'generalBilling', 'calculator', 'cashClose', 'condos', 'settings', 'users', 'personal', 'reporte_diario'],
   createdAt: new Date().toISOString()
 };
 
@@ -279,14 +285,24 @@ export const storage = {
       usersList = JSON.parse(data);
     }
     
-    // Auto-update Admin user if permission 'users' is missing
+    // Auto-update Admin user if permission 'users', 'personal' or 'reporte_diario' is missing
     let altered = false;
     const migratedUsers = usersList.map((u) => {
       if (u.id === "user-admin" || u.username.toLowerCase() === "admin") {
-        if (!u.permissions.includes("users")) {
-          u.permissions = [...u.permissions, "users"];
+        let updatedPermissions = [...u.permissions];
+        if (!updatedPermissions.includes("users")) {
+          updatedPermissions.push("users");
           altered = true;
         }
+        if (!updatedPermissions.includes("personal")) {
+          updatedPermissions.push("personal");
+          altered = true;
+        }
+        if (!updatedPermissions.includes("reporte_diario")) {
+          updatedPermissions.push("reporte_diario");
+          altered = true;
+        }
+        u.permissions = updatedPermissions;
       }
       return u;
     });
@@ -305,8 +321,22 @@ export const storage = {
     try {
       const user = JSON.parse(data) as AppUser;
       if (user && (user.id === "user-admin" || user.username.toLowerCase() === "admin")) {
-        if (!user.permissions.includes("users")) {
-          user.permissions = [...user.permissions, "users"];
+        let updatedPermissions = [...user.permissions];
+        let altered = false;
+        if (!updatedPermissions.includes("users")) {
+          updatedPermissions.push("users");
+          altered = true;
+        }
+        if (!updatedPermissions.includes("personal")) {
+          updatedPermissions.push("personal");
+          altered = true;
+        }
+        if (!updatedPermissions.includes("reporte_diario")) {
+          updatedPermissions.push("reporte_diario");
+          altered = true;
+        }
+        if (altered) {
+          user.permissions = updatedPermissions;
         }
       }
       return user;
@@ -320,6 +350,37 @@ export const storage = {
     } else {
       localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
     }
+  },
+
+  getEmployees: (): Empleado[] => {
+    const data = localStorage.getItem(STORAGE_KEYS.EMPLOYEES);
+    return data ? JSON.parse(data) : [];
+  },
+  saveEmployees: (e: Empleado[]) => {
+    localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(e));
+  },
+  getWorkAreas: (): AreaTrabajo[] => {
+    const data = localStorage.getItem(STORAGE_KEYS.WORK_AREAS);
+    if (!data) {
+      const initialAreas: AreaTrabajo[] = [
+        { id: 'area-admin', name: 'Administración', createdAt: Date.now() },
+        { id: 'area-ventas', name: 'Ventas', createdAt: Date.now() - 1000 },
+        { id: 'area-soporte', name: 'Soporte y Operaciones', createdAt: Date.now() - 2000 }
+      ];
+      localStorage.setItem(STORAGE_KEYS.WORK_AREAS, JSON.stringify(initialAreas));
+      return initialAreas;
+    }
+    return JSON.parse(data);
+  },
+  saveWorkAreas: (wa: AreaTrabajo[]) => {
+    localStorage.setItem(STORAGE_KEYS.WORK_AREAS, JSON.stringify(wa));
+  },
+  getReceipts: (): Recibo[] => {
+    const data = localStorage.getItem(STORAGE_KEYS.RECEIPTS);
+    return data ? JSON.parse(data) : [];
+  },
+  saveReceipts: (r: Recibo[]) => {
+    localStorage.setItem(STORAGE_KEYS.RECEIPTS, JSON.stringify(r));
   },
 
   exportAllData: () => {
