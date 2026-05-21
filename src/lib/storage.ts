@@ -18,7 +18,8 @@ import {
   AppUser,
   Empleado,
   AreaTrabajo,
-  Recibo
+  Recibo,
+  CorteCaja
 } from '../types';
 
 const STORAGE_KEYS = {
@@ -43,7 +44,8 @@ const STORAGE_KEYS = {
   CURRENT_USER: 'condobill_current_user',
   EMPLOYEES: 'condobill_employees',
   WORK_AREAS: 'condobill_work_areas',
-  RECEIPTS: 'condobill_receipts'
+  RECEIPTS: 'condobill_receipts',
+  CORTES: 'condobill_cortes'
 };
 
 export const DEFAULT_ADMIN_USER: AppUser = {
@@ -381,6 +383,13 @@ export const storage = {
   },
   saveReceipts: (r: Recibo[]) => {
     localStorage.setItem(STORAGE_KEYS.RECEIPTS, JSON.stringify(r));
+  },
+  getCortes: (): CorteCaja[] => {
+    const data = localStorage.getItem(STORAGE_KEYS.CORTES);
+    return data ? JSON.parse(data) : [];
+  },
+  saveCortes: (c: CorteCaja[]) => {
+    localStorage.setItem(STORAGE_KEYS.CORTES, JSON.stringify(c));
   },
 
   exportAllData: () => {

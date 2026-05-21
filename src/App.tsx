@@ -95,6 +95,7 @@ import {
   Empleado,
   AreaTrabajo,
   Recibo,
+  CorteCaja,
 } from "./types";
 import * as XLSX from "xlsx";
 import LoginView from "./components/LoginView";
@@ -141,6 +142,7 @@ export default function App() {
   const [suppliers, setSuppliers] = useState<Proveedor[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
+  const [cortes, setCortes] = useState<CorteCaja[]>([]);
   const [employees, setEmployees] = useState<Empleado[]>([]);
   const [areas, setAreas] = useState<AreaTrabajo[]>([]);
   const [receipts, setReceipts] = useState<Recibo[]>([]);
@@ -334,6 +336,7 @@ export default function App() {
     const loadedEmployees = storage.getEmployees();
     const loadedAreas = storage.getWorkAreas();
     const loadedReceipts = storage.getReceipts();
+    const loadedCortes = storage.getCortes();
 
     setCondos(finalCondos);
     setTransactions(loadedTransactions);
@@ -347,6 +350,7 @@ export default function App() {
     setSuppliers(loadedSuppliers);
     setProducts(loadedProducts);
     setSales(loadedSales);
+    setCortes(loadedCortes);
     setEmployees(loadedEmployees);
     setAreas(loadedAreas);
     setReceipts(loadedReceipts);
@@ -412,6 +416,10 @@ export default function App() {
   useEffect(() => {
     storage.saveSales(sales);
   }, [sales]);
+
+  useEffect(() => {
+    storage.saveCortes(cortes);
+  }, [cortes]);
 
   useEffect(() => {
     storage.saveEmployees(employees);
@@ -1208,8 +1216,15 @@ export default function App() {
                 {activeTab === "cashClose" && (
                   <CashCloseView
                     sales={sales}
+                    setSales={setSales}
                     transactions={transactions}
+                    setTransactions={setTransactions}
                     products={products}
+                    employees={employees}
+                    condos={condos}
+                    cortes={cortes}
+                    setCortes={setCortes}
+                    currentUser={currentUser}
                   />
                 )}
                 {activeTab === "condos" && (

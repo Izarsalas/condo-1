@@ -56,6 +56,7 @@ export interface Transaction {
   date: string;
   description?: string;
   employeeId?: string;
+  corteId?: string;
 }
 
 export interface Category {
@@ -151,6 +152,7 @@ export interface Sale {
   reference?: string;
   exchangeRate?: number;
   usdAmount?: number;
+  corteId?: string;
 }
 
 export interface Client {
@@ -238,6 +240,24 @@ export interface Recibo {
   beneficiario: string;
   condominioId?: string;
   createdAt: number;
+}
+
+export interface CorteCaja {
+  id: string;
+  date: string; // ISO String representation of when the cut was made
+  salesCount: number;
+  totalSales: number;
+  totalOtherIncome: number;
+  totalExpenses: number;
+  totalCOGS: number;
+  netProfit: number;
+  salesIds: string[];
+  transactionIds: string[];
+  notes?: string;
+  cashExpected: number;
+  cashReported: number;
+  difference: number;
+  closedBy: string; // User who made the cut
 }
 
 
